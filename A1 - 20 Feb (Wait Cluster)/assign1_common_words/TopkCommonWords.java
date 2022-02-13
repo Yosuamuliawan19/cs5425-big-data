@@ -165,10 +165,10 @@ public class TopkCommonWords{
         String inputFile2 = parsedArgs[1];
         String stopwordsFile = parsedArgs[2];
         String outputFile = parsedArgs[3];
-        // String inputDir = new File(inputFile1).getParentFile().getName();
+        String inputDir = new File(inputFile1).getParentFile().getName();
 
         long currentTimeEpochs = System.currentTimeMillis() / 1000L;
-        String tempFile =  "/temp" + String.valueOf( currentTimeEpochs);
+        String tempFile =  inputDir  + "/temp" + String.valueOf( currentTimeEpochs);
 
 
         conf.set("stopwordsFile", stopwordsFile);
