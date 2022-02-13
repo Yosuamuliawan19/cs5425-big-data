@@ -1,5 +1,5 @@
-// Matric Number:
-// Name:
+// Matric Number:A0228565W
+// Name:Yosua Muliawan
 // WordCount.java
 import java.io.BufferedReader;
 import java.io.IOException;
