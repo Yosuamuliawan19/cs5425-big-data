@@ -166,9 +166,10 @@ public class TopkCommonWords{
         String stopwordsFile = parsedArgs[2];
         String outputFile = parsedArgs[3];
         String inputDir = new File(inputFile1).getParentFile().getName();
-        String tempFile = inputDir + "/temp";
 
-        FileUtils.deleteQuietly(new File(tempFile));
+        long currentTimeEpochs = System.currentTimeMillis() / 1000L;
+        String tempFile = inputDir + "/temp" + String.valueOf( currentTimeEpochs);
+
 
         conf.set("stopwordsFile", stopwordsFile);
 
