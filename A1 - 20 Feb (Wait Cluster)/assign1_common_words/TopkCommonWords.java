@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
-
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -168,8 +168,7 @@ public class TopkCommonWords{
         String inputDir = new File(inputFile1).getParentFile().getName();
         String tempFile = inputDir + "/temp";
 
-
-        boolean result = Files.deleteIfExists(new File(tempFile).toPath());
+        FileUtils.deleteQuietly(new File(tempFile));
 
         conf.set("stopwordsFile", stopwordsFile);
 
