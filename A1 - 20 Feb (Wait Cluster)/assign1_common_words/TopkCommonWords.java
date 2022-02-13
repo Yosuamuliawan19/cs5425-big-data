@@ -164,7 +164,7 @@ public class TopkCommonWords {
         String inputFile2 = parsedArgs[1];
         String stopwordsFile = parsedArgs[2];
         String outputFile = parsedArgs[3];
-        String tempFile = "temp";
+        String tempFile = outputFile +  "/temp";
         conf.set("stopwordsFile", stopwordsFile);
 
         System.out.println("Parsed arguments");
