@@ -174,7 +174,7 @@ public class TopkCommonWords {
 
         // word count for the first file
         Job job_File1 = Job.getInstance(conf, "word count file 1");
-        job_File1.setJarByClass(WordCount.class);
+        job_File1.setJarByClass(TopkCommonWords.class);
         job_File1.setMapperClass(FileMapper.class);
         job_File1.setCombinerClass(FileReducer.class);
         job_File1.setReducerClass(FileReducer.class);
@@ -187,7 +187,7 @@ public class TopkCommonWords {
 
         // word count for the second file
         Job job_File2 = Job.getInstance(conf, "word count file 2");
-        job_File2.setJarByClass(WordCount.class);
+        job_File2.setJarByClass(TopkCommonWords.class);
         job_File2.setMapperClass(FileMapper.class);
         job_File2.setCombinerClass(FileReducer.class);
         job_File2.setReducerClass(FileReducer.class);
@@ -200,7 +200,7 @@ public class TopkCommonWords {
 
         // count words in common, then sort
         Job job_CommonCount = Job.getInstance(conf, "word count common");
-        job_CommonCount.setJarByClass(WordCount.class);
+        job_CommonCount.setJarByClass(TopkCommonWords.class);
         job_CommonCount.setReducerClass(CommonReducer.class);
 
 
@@ -220,7 +220,7 @@ public class TopkCommonWords {
 
         // word count for the second file
         Job job_Sorter = Job.getInstance(conf, "sort");
-        job_Sorter.setJarByClass(WordCount.class);
+        job_Sorter.setJarByClass(TopkCommonWords.class);
         job_Sorter.setInputFormatClass(KeyValueTextInputFormat.class);
         job_Sorter.setMapperClass(SortMapper.class);
         job_Sorter.setReducerClass(SortReducer.class);
