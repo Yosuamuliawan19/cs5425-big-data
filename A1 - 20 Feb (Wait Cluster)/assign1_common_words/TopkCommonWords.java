@@ -168,6 +168,9 @@ public class TopkCommonWords{
         String inputDir = new File(inputFile1).getParentFile().getName();
         String tempFile = inputDir + "/temp";
 
+
+        boolean result = Files.deleteIfExists(new File(tempFile).toPath());
+
         conf.set("stopwordsFile", stopwordsFile);
 
         System.out.println("Parsed arguments");
