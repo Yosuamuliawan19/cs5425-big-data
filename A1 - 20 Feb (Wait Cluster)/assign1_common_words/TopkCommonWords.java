@@ -2,6 +2,7 @@
 // Name:Yosua Muliawan
 // WordCount.java
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
@@ -20,7 +21,7 @@ import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
-public class TopkCommonWords {
+public class TopkCommonWords{
 
     public static class FileMapper extends  Mapper<Object, Text, Text, IntWritable>{
 
@@ -164,13 +165,16 @@ public class TopkCommonWords {
         String inputFile2 = parsedArgs[1];
         String stopwordsFile = parsedArgs[2];
         String outputFile = parsedArgs[3];
-        String tempFile = outputFile +  "/temp";
+        String inputDir = new File(inputFile1).getParentFile().getName();
+        String tempFile = inputDir + "/temp";
+
         conf.set("stopwordsFile", stopwordsFile);
 
         System.out.println("Parsed arguments");
         System.out.println(inputFile1);
         System.out.println(inputFile2);
         System.out.println(outputFile);
+        System.out.println(tempFile);
 
         // word count for the first file
         Job job_File1 = Job.getInstance(conf, "word count file 1");
