@@ -20,7 +20,7 @@ import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
-public class WordCount {
+public class TopkCommonWords {
 
     public static class FileMapper extends  Mapper<Object, Text, Text, IntWritable>{
 
