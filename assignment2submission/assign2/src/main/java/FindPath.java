@@ -56,11 +56,11 @@ public class FindPath {
         // set all visited  = false, and distance infinite
         Dataset<Row> vertices =
                 g.vertices()
-                .withColumn("visited", functions.lit(false))
-                .withColumn("distance", functions.when(
-                        g.vertices().col("id").cast(DataTypes.StringType).equalTo(origin) , 0)
-                        .otherwise(Float.POSITIVE_INFINITY)
-                ).withColumn("path", functions.lit(null));
+                        .withColumn("visited", functions.lit(false))
+                        .withColumn("distance", functions.when(
+                                        g.vertices().col("id").cast(DataTypes.StringType).equalTo(origin) , 0)
+                                .otherwise(Float.POSITIVE_INFINITY)
+                        ).withColumn("path", functions.lit(null));
 
         // initialize g2 as all nodes, with infinite distance
         Dataset<Row> cached_vertices = AggregateMessages.getCachedDataFrame(vertices);
@@ -106,17 +106,17 @@ public class FindPath {
             // construct new distance col
             Column new_distance_col =
                     functions.when(
-                        new_distances.col("aggMess").isNotNull().and(
-                        (new_distances.col("aggMess").getItem("col1").lt(g2.vertices().col("distance")))),
-                        new_distances.col("aggMess").getItem("col1")
+                            new_distances.col("aggMess").isNotNull().and(
+                                    (new_distances.col("aggMess").getItem("col1").lt(g2.vertices().col("distance")))),
+                            new_distances.col("aggMess").getItem("col1")
                     ).otherwise(g2.vertices().col("distance"));
 
             // construct new path
             Column new_path_col = functions.when(
                     new_distances.col("aggMess").isNotNull().and(
-                    new_distances.col("aggMess").getItem("col1").$less(g2.vertices().col("distance"))),
+                            new_distances.col("aggMess").getItem("col1").$less(g2.vertices().col("distance"))),
                     new_distances.col("aggMess").getItem("col2").cast(DataTypes.StringType)
-                    ).otherwise(g2.vertices().col("path").cast(DataTypes.StringType));
+            ).otherwise(g2.vertices().col("path").cast(DataTypes.StringType));
 
             // construct new vertices
             Dataset<Row> new_vertices = (g2.vertices().join(new_distances, g2.vertices().col("id").equalTo(new_distances.col("id")), "left_outer")
@@ -175,13 +175,13 @@ public class FindPath {
         String SHORTEST_PATH_OUTPUT = outputFile2;
         String INTER_OSM_OUTPUT = OSM_OUTPUT + "_INTER";
 
-        
+
         File directory = new File(OSM_OUTPUT);
-        file.getParentFile().mkdirs();
+        directory.getParentFile().mkdirs();
         directory = new File(SHORTEST_PATH_OUTPUT);
-        file.getParentFile().mkdirs();
+        directory.getParentFile().mkdirs();
         directory = new File(INTER_OSM_OUTPUT);
-        file.getParentFile().mkdirs();
+        directory.getParentFile().mkdirs();
 
 
         // Load bfs queries
@@ -251,7 +251,7 @@ public class FindPath {
                 "SELECT concat(from, concat(' ', concat_ws(' ', array_sort(collect_set(to)))))  as adj FROM all_edges GROUP BY from SORT BY from"
         ).coalesce(1);
 
-        
+
         adj_list.write().mode(SaveMode.Overwrite).format("txt").text(INTER_OSM_OUTPUT);
         Path oldPath = fs.globStatus(new Path(INTER_OSM_OUTPUT + "/part*"))[0].getPath();
 
@@ -282,7 +282,7 @@ public class FindPath {
 
         // Go to queries
         for (String[] query: bfs_queries){
-            
+
 
             String src = query[0];
             String dst = query[1];
@@ -303,7 +303,7 @@ public class FindPath {
             // save file
             System.out.println("Final path: "  + formatted_path);
             output.write(formatted_path);
-            
+
         }
         output.close();
 
