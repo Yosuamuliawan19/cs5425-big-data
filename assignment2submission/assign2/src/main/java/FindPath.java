@@ -254,7 +254,6 @@ public class FindPath {
 
         adj_list.write().mode(SaveMode.Overwrite).format("txt").text(INTER_OSM_OUTPUT);
         Path oldPath = fs.globStatus(new Path(INTER_OSM_OUTPUT + "/part*"))[0].getPath();
-
         fs.rename(oldPath, new Path(OSM_OUTPUT));
 
 
@@ -274,15 +273,16 @@ public class FindPath {
 
         // construct graph
         GraphFrame graph  = new GraphFrame(df_nodes, distance);
-        File file = new File(SHORTEST_PATH_OUTPUT);
-        file.getParentFile().mkdirs();
-        FileWriter filew = new FileWriter(SHORTEST_PATH_OUTPUT);
-        BufferedWriter output = new BufferedWriter(filew);
+        BufferedWriter output = new BufferedWriter(new OutputStreamWriter(
+                FileSystem.get(
+                        spark.sparkContext().hadoopConfiguration()).create(
+                        new org.apache.hadoop.fs.Path(SHORTEST_PATH_OUTPUT),
+                true)
+        ));
 
 
         // Go to queries
         for (String[] query: bfs_queries){
-
 
             String src = query[0];
             String dst = query[1];
