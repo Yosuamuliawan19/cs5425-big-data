@@ -275,8 +275,10 @@ public class FindPath {
 
         // construct graph
         GraphFrame graph  = new GraphFrame(df_nodes, distance);
-        FileWriter file = new FileWriter(SHORTEST_PATH_OUTPUT);
-        BufferedWriter output = new BufferedWriter(file);
+        File file = new File(SHORTEST_PATH_OUTPUT);
+        file.getParentFile().mkdirs();
+        FileWriter filew = new FileWriter(SHORTEST_PATH_OUTPUT);
+        BufferedWriter output = new BufferedWriter(filew);
 
 
         // Go to queries
