@@ -173,16 +173,15 @@ public class FindPath {
         String OSM_OUTPUT = outputFile1;
         String SHORTEST_PATH_QUERIES = inputFile2;
         String SHORTEST_PATH_OUTPUT = outputFile2;
+        String INTER_OSM_OUTPUT = OSM_OUTPUT + "_INTER";
 
-
+        
         File directory = new File(OSM_OUTPUT);
-        if (! directory.exists()){
-            directory.mkdir();
-        }
+        file.getParentFile().mkdirs();
         directory = new File(SHORTEST_PATH_OUTPUT);
-        if (! directory.exists()){
-            directory.mkdir();
-        }
+        file.getParentFile().mkdirs();
+        directory = new File(INTER_OSM_OUTPUT);
+        file.getParentFile().mkdirs();
 
 
         // Load bfs queries
@@ -252,7 +251,7 @@ public class FindPath {
                 "SELECT concat(from, concat(' ', concat_ws(' ', array_sort(collect_set(to)))))  as adj FROM all_edges GROUP BY from SORT BY from"
         ).coalesce(1);
 
-        String INTER_OSM_OUTPUT = OSM_OUTPUT + "_INTER";
+        
         adj_list.write().mode(SaveMode.Overwrite).format("txt").text(INTER_OSM_OUTPUT);
         Path oldPath = fs.globStatus(new Path(INTER_OSM_OUTPUT + "/part*"))[0].getPath();
 
