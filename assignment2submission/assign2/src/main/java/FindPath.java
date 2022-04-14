@@ -70,11 +70,11 @@ public class FindPath {
         );
 
         // as long as all is not yet viist
-        while(g2.vertices().filter("visited == False").count() != 0){
+        while(g2.vertices().filter(g2.vertices().col("visited").equalTo("false")).count() != 0){
 
 
             // get node with nearest distance
-            Long current_node_id = g2.vertices().filter("visited == False").sort("distance").first().getLong(0);
+            Long current_node_id = g2.vertices().filter(g2.vertices().col("visited").equalTo("false")).sort("distance").first().getLong(0);
             System.out.println("Current node: " + current_node_id.toString());
 
 
@@ -303,7 +303,7 @@ public class FindPath {
             // save file
             System.out.println("Final path: "  + formatted_path);
             output.write(formatted_path);
-
+            output.flush();
         }
         output.close();
 
