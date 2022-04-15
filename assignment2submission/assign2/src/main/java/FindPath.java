@@ -1,8 +1,11 @@
 // Matric Number:A0228565W
 // Name:Yosua Muliawan
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.Dataset;
@@ -11,15 +14,24 @@ import org.apache.spark.sql.expressions.UserDefinedFunction;
 import org.apache.spark.sql.expressions.Window;
 import org.apache.spark.sql.expressions.WindowSpec;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.graphframes.GraphFrame;
 import org.graphframes.lib.AggregateMessages;
 import org.apache.hadoop.util.GenericOptionsParser;
 import static org.apache.spark.sql.functions.udf;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.functions;
 import org.apache.spark.api.java.function.ForeachFunction;
+import scala.collection.mutable.WrappedArray;
+
 public class FindPath {
     // From: https://stackoverflow.com/questions/3694380/calculating-distance-between-two-points-using-latitude-longitude
     private static double distance(double lat1, double lat2, double lon1, double lon2) {
@@ -41,51 +53,62 @@ public class FindPath {
     }
 
 
-    public static Dataset<Row> shortest_path(GraphFrame g, String origin, String destination, String column_name, SparkSession spark){
+    public static Dataset<Row> shortest_path(GraphFrame g, Long origin, Long destination, String column_name, SparkSession spark){
 
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(spark.sparkContext());
         jsc.setLogLevel("WARN");
 
-
-        // if vertices doesnt contain destination, return
-        if (g.vertices().filter(g.vertices().col("id").equalTo(destination)).count() == 0){
+        // if vertices doesn't contain destination, return
+        if (g.vertices().filter(g.vertices().col("id").equalTo(destination)).count() == 0 ||
+            g.vertices().filter(g.vertices().col("id").equalTo(origin)).count() == 0 ){
             return spark.emptyDataFrame().withColumn("path", functions.lit(null));
         }
 
-        System.out.println("Origin, destination: "  + origin + " "  + destination);
+        System.out.println("Origin, destination: "  + origin.toString() + " "  + destination);
         // set all visited  = false, and distance infinite
-        Dataset<Row> vertices =
-                g.vertices()
-                        .withColumn("visited", functions.lit(false))
-                        .withColumn("distance", functions.when(
-                                        g.vertices().col("id").cast(DataTypes.StringType).equalTo(origin) , 0)
-                                .otherwise(Float.POSITIVE_INFINITY)
+        Dataset<Row> vertices = g.vertices().withColumn("visited", functions.lit(false))
+                        .withColumn("distance", functions.when(g.vertices().col("id").equalTo(origin) , 0)
+                            .otherwise(Float.POSITIVE_INFINITY)
                         ).withColumn("path", functions.lit(null));
 
         // initialize g2 as all nodes, with infinite distance
         Dataset<Row> cached_vertices = AggregateMessages.getCachedDataFrame(vertices);
-        GraphFrame g2 = new GraphFrame(cached_vertices, g.edges());
+        GraphFrame g2 = GraphFrame.apply(cached_vertices, g.edges());
         UserDefinedFunction add_path_udf = udf(
                 (path, id) -> add_path((String) path, (Long) id), DataTypes.StringType
         );
 
-        // as long as all is not yet viist
-        while(g2.vertices().filter(g2.vertices().col("visited").equalTo("false")).count() != 0){
 
+        spark.sqlContext().udf()
+                .register( "add_path", (
+                        WrappedArray<Long> path, Long id) -> {
+                    List<Long> combined = new ArrayList<>();
+                    scala.collection.Iterator iterator = path.iterator();
+                    while (iterator.hasNext()) {
+                        combined.add((Long)iterator.next());
+                    }
+                    combined.add(id);
+                    return combined;
+                }, DataTypes.createArrayType(DataTypes.LongType)
+                );
+
+
+        // as long as all is not yet viist
+        while(g2.vertices().filter(g2.vertices().col("visited").equalTo(false)).count() != 0){
 
             // get node with nearest distance
-            Long current_node_id = g2.vertices().filter(g2.vertices().col("visited").equalTo("false")).sort("distance").first().getLong(0);
+            Long current_node_id = g2.vertices().filter(g2.vertices().col("visited").equalTo(false)).sort("distance").first().getLong(0);
             System.out.println("Current node: " + current_node_id.toString());
 
 
             // to get new distances value
             Column msg_distance = AggregateMessages.edge().getField(column_name).plus(AggregateMessages.src().getField("distance")) ;
-            Column msg_path =  add_path_udf.apply(
-                    functions.when(AggregateMessages.src().getItem("path").isNotNull(),
-                            AggregateMessages.src().getItem("path").cast(DataTypes.StringType)).otherwise(""),
-                    AggregateMessages.src().getItem("id")
-            );
 
+            Column msg_path = functions.when(AggregateMessages.src().getField("path").isNotNull(),
+                    functions.callUDF("add_path",
+                            AggregateMessages.src().getField("path"),
+                            AggregateMessages.src().getField("id")))
+                    .otherwise(functions.array(AggregateMessages.src().getField("id")));
             Column msg_for_dst = functions.when(
                     AggregateMessages.src().getField("id").equalTo(current_node_id),
                     functions.struct(
@@ -96,55 +119,63 @@ public class FindPath {
 
             Dataset<Row> new_distances = g2.aggregateMessages()
                     .sendToDst(msg_for_dst)
-                    .agg(functions.min(AggregateMessages.msg()).alias("aggMess"));
+                    .agg(functions.min(AggregateMessages.msg()).alias("aggMess")).coalesce(1).cache();
 
             // construct new visited
             Column new_visited_col = functions.when(
-                    g2.vertices().col("visited").or(g2.vertices().col("id").equalTo(current_node_id)),
-                    true).otherwise(false);
+                    g2.vertices().col("id").equalTo(current_node_id)
+                    .or(g2.vertices().col("visited").equalTo(true))
+                    ,true
+            ).otherwise(false);
 
             // construct new distance col
-            Column new_distance_col =
-                    functions.when(
-                            new_distances.col("aggMess").isNotNull().and(
-                                    (new_distances.col("aggMess").getItem("col1").lt(g2.vertices().col("distance")))),
-                            new_distances.col("aggMess").getItem("col1")
-                    ).otherwise(g2.vertices().col("distance"));
+            Column new_distance_col = functions.when(
+                    new_distances.col("aggMess").isNotNull().and((
+                    new_distances.col("aggMess").getItem("col1").lt(g2.vertices().col("distance")))),
+                    new_distances.col("aggMess").getItem("col1")
+            ).otherwise(g2.vertices().col("distance"));
 
             // construct new path
             Column new_path_col = functions.when(
                     new_distances.col("aggMess").isNotNull().and(
-                            new_distances.col("aggMess").getItem("col1").$less(g2.vertices().col("distance"))),
-                    new_distances.col("aggMess").getItem("col2").cast(DataTypes.StringType)
-            ).otherwise(g2.vertices().col("path").cast(DataTypes.StringType));
+                    new_distances.col("aggMess").getItem("col1").$less(g2.vertices().col("distance"))),
+                    new_distances.col("aggMess").getItem("col2")
+            ).otherwise(g2.vertices().col("path"));
 
             // construct new vertices
-            Dataset<Row> new_vertices = (g2.vertices().join(new_distances, g2.vertices().col("id").equalTo(new_distances.col("id")), "left_outer")
+            Dataset<Row> new_vertices =
+                    g2.vertices().join(new_distances, g2.vertices().col("id").equalTo(new_distances.col("id")), "left_outer")
                     .drop(new_distances.col("id"))
-                    .withColumn("visited", new_visited_col)
+                    .withColumn("newVisited", new_visited_col)
                     .withColumn("newDistance", new_distance_col)
                     .withColumn("newPath", new_path_col)
-                    .drop("aggMess", "distance", "path")
+                    .drop("aggMess", "visited", "distance", "path")
+                    .withColumnRenamed("newVisited", "visited")
                     .withColumnRenamed("newDistance", "distance")
-                    .withColumnRenamed("newPath", "path"));
-
+                    .withColumnRenamed("newPath", "path").coalesce(1);
 
             Dataset<Row> cached_new_vertices = AggregateMessages.getCachedDataFrame(new_vertices);
             cached_new_vertices.cache();
-            g2 = new GraphFrame(cached_new_vertices, g2.edges());
+            g2 =  GraphFrame.apply(cached_new_vertices, g2.edges());
 
 //            g2.vertices().sort(g2.vertices().col("distance")).show();
 
             // if destination is visited
+//            g2.vertices().filter(g2.vertices().col("id").equalTo(destination)).show();
             if (g2.vertices().filter(g2.vertices().col("id").equalTo(destination)).first().getBoolean(1)){
                 return g2.vertices().filter(g2.vertices().col("id").equalTo(destination))
-                        .withColumn("newPath", add_path_udf.apply(g2.vertices().col("path").cast(DataTypes.StringType), g2.vertices().col("id")))
+                        .withColumn("newPath", functions.callUDF("add_path",
+                                                g2.vertices().col("path"), g2.vertices().col("id")
+                                ))
                         .drop("visited", "path")
                         .withColumnRenamed("newPath", "path");
             }
         }
         return spark.emptyDataFrame().withColumn("path", functions.lit(null));
     }
+
+
+
 
     public static void main(String[] args) throws Exception {
 
@@ -271,28 +302,35 @@ public class FindPath {
         );
         df_nodes = df_nodes.select(df_nodes.col("_id")).withColumnRenamed("_id", "id");
 
-        // construct graph
-        GraphFrame graph  = new GraphFrame(df_nodes, distance);
-        BufferedWriter output = new BufferedWriter(new OutputStreamWriter(
-                FileSystem.get(
-                        spark.sparkContext().hadoopConfiguration()).create(
-                        new org.apache.hadoop.fs.Path(SHORTEST_PATH_OUTPUT),
-                true)
-        ));
 
+        System.out.println("Graph nodes and edges");
+        df_nodes.printSchema();
+        distance.printSchema();
+
+        GraphFrame graph  = GraphFrame.apply(df_nodes, distance);
+//        BFS_RUN_QUERY(graph,  SHORTEST_PATH_QUERIES,  SHORTEST_PATH_OUTPUT, spark);
+        // construct graph
+//        BufferedWriter output = new BufferedWriter(new OutputStreamWriter(
+//                FileSystem.get(
+//                        spark.sparkContext().hadoopConfiguration()).create(
+//                        new org.apache.hadoop.fs.Path(SHORTEST_PATH_OUTPUT),
+//                true)
+//        ));
+        Path output_path = new Path(SHORTEST_PATH_OUTPUT);
+        FSDataOutputStream output =  fs.create(output_path);
 
         // Go to queries
         for (String[] query: bfs_queries){
 
             String src = query[0];
             String dst = query[1];
-            Dataset<Row> path = shortest_path(graph, src, dst, "distance", spark);
-            String final_path = path.sort("distance").first().getString(2);
+            Dataset<Row> path = shortest_path(graph, Long.parseLong(src), Long.parseLong(dst), "distance", spark);
+            List<Long> paths = path.sort("distance").first().getList(2);
 
             // format path
-            String[] splited_path = final_path.split("\\s+");
             String formatted_path = src + " -> ";
-            for (String node: splited_path){
+            for (Long cur_node: paths){
+                String node = String.valueOf(cur_node);
                 if (node.equals(src) || node.equals(dst) || node.length() == 0 || node == " "){
                     continue;
                 }
@@ -302,8 +340,8 @@ public class FindPath {
 
             // save file
             System.out.println("Final path: "  + formatted_path);
-            output.write(formatted_path);
-            output.flush();
+            output.writeBytes(formatted_path);
+            output.hflush();
         }
         output.close();
 
