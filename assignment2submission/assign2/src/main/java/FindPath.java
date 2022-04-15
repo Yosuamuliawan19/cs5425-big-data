@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.functions;
 import org.apache.spark.api.java.function.ForeachFunction;
+import scala.collection.JavaConversions;
 import scala.collection.mutable.WrappedArray;
 
 public class FindPath {
@@ -83,9 +84,8 @@ public class FindPath {
                 .register( "add_path", (
                                 WrappedArray<Long> path, Long id) -> {
                             List<Long> combined = new ArrayList<>();
-                            scala.collection.Iterator iterator = path.iterator();
-                            while (iterator.hasNext()) {
-                                combined.add((Long)iterator.next());
+                            for(int i=0; i<path.size(); i++){
+                                combined.add((Long) path.apply(i));
                             }
                             combined.add(id);
                             return combined;
@@ -307,11 +307,11 @@ public class FindPath {
         df_nodes.printSchema();
         distance.printSchema();
 
-
-        System.out.println(df_nodes.count());
-        System.out.println(distance.count());
-        df_nodes.show();
-        distance.show();
+//
+//        System.out.println(df_nodes.count());
+//        System.out.println(distance.count());
+//        df_nodes.show();
+//        distance.show();
 
         GraphFrame graph  = GraphFrame.apply(df_nodes, distance);
         Path output_path = new Path(SHORTEST_PATH_OUTPUT);
